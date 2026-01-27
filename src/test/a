@@ -1,0 +1,68 @@
+package it.unisa.uniclass;
+
+import sootup.callgraph.CallGraph;
+import sootup.callgraph.CallGraphAlgorithm;
+import sootup.callgraph.cha.ClassHierarchyAnalysisAlgorithm;
+import sootup.java.bytecode.frontend.JavaView;
+import sootup.java.core.views.JavaClassPathAnalysisInputLocation;
+import java.io.FileWriter;
+import java.nio.file.Paths;
+import java.util.Collections;
+
+public class UniClassAnalyzer {
+    public static void main(String[] args) {
+        // 1. PUNTA ALLA TUA REPO LOCALE
+        // Maven mette i file compilati qui. Assicurati di aver fatto 'mvn compile'
+        String classesPath = Paths.get("target", "classes").toAbsolutePath().toString();
+        JavaView view = new JavaView(new JavaClassPathAnalysisInputLocation(classesPath));
+
+        System.out.println("Analisi avviata sulla repo UniClass...");
+
+        // --- ANALISI 1: STRUTTURA DELLE CLASSI (Architecture) ---
+        generateClassDiagram(view);
+
+        // --- ANALISI 2: FLUSSO DELLE CHIAMATE (Call Graph) ---
+        generateCallGraph(view);
+
+        System.out.println("Analisi completata!");
+    }
+
+    private static void generateClassDiagram(JavaView view) {
+        try (FileWriter writer = new FileWriter("architettura_classi.dot")) {
+            writer.write("digraph G {\n  rankdir=BT;\n  node [shape=box, style=filled, color=lightblue];\n");
+            view.getClasses().forEach(sootClass -> {
+                String name = sootClass.getType().toString();
+                if (name.startsWith("it.unisa.uniclass")) {
+                    sootClass.getSuperclass().ifPresent(parent -> {
+                        if (parent.toString().startsWith("it.unisa.uniclass")) {
+                            try { writer.write("  \"" + name + "\" -> \"" + parent + "\" [label=\"extends\"];\n"); } catch (Exception e) {}
+                        }
+                    });
+                }
+            });
+            writer.write("}\n");
+            System.out.println("- Generato: architettura_classi.dot");
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    private static void generateCallGraph(JavaView view) {
+        try (FileWriter writer = new FileWriter("flusso_chiamate.dot")) {
+            writer.write("digraph G {\n  rankdir=LR;\n  node [shape=ellipse, style=filled, color=lightyellow];\n");
+            CallGraphAlgorithm algorithm = new ClassHierarchyAnalysisAlgorithm(view);
+            CallGraph cg = algorithm.initialize(Collections.emptyList());
+
+            cg.getEdges().forEach(edge -> {
+                String src = edge.getSource().getDeclaringClass().toString();
+                String tgt = edge.getTarget().getDeclaringClass().toString();
+                if (src.startsWith("it.unisa.uniclass") && tgt.startsWith("it.unisa.uniclass")) {
+                    try {
+                        writer.write("  \"" + edge.getSource().getName() + " (" + edge.getSource().getDeclaringClass().getShortName() + ")\" -> " +
+                                     "\"" + edge.getTarget().getName() + " (" + edge.getTarget().getDeclaringClass().getShortName() + ")\";\n");
+                    } catch (Exception e) {}
+                }
+            });
+            writer.write("}\n");
+            System.out.println("- Generato: flusso_chiamate.dot");
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+}

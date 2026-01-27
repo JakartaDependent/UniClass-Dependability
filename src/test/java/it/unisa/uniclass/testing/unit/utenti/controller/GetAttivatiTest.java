@@ -52,6 +52,7 @@ class GetAttivatiTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         servlet = new TestableGetAttivati();
+        when(request.getServletContext()).thenReturn(mock(jakarta.servlet.ServletContext.class));
     }
 
     @Test
@@ -96,5 +97,7 @@ class GetAttivatiTest {
     void testDoPost() throws Exception {
         // Chiamata al metodo doPost ereditato da HttpServlet
         servlet.callDoPost(request, response);
+        verify(response, never()).getWriter();
+
     }
 }
